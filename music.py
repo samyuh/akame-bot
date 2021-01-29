@@ -68,16 +68,6 @@ class Music(commands.Cog):
         self.queue = []
         self.loop = False
         self.player = None
-
-    @commands.command()
-    async def join(self, ctx, *, channel: discord.VoiceChannel):
-        """Joins a voice channel"""
-
-        if ctx.voice_client is not None:
-            return await ctx.voice_client.move_to(channel)
-
-        await channel.connect()      
-
     
     @commands.command(pass_context=True, aliases=['Skip'])
     async def skip(self, ctx):
@@ -221,7 +211,6 @@ class Music(commands.Cog):
         self.queue = []
         await ctx.send(":white_check_mark: Bye, songs! :cry:")
 
-
     @commands.command()
     async def play(self, ctx, *args):
         """Plays from a url (almost anything youtube_dl supports)"""
@@ -232,64 +221,46 @@ class Music(commands.Cog):
         content = content.split()
 
         try:
-            pseudo_url = content[0]
-            if validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("radio" in pseudo_url):
-                await ctx.send(":x: I can't play Youtube Radio playlists!")
+            if content:
+                pseudo_url = content[0]
+                if validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("radio" in pseudo_url):
+                    await ctx.send(":x: I can't play Youtube Radio playlists!")
 
-            elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("list" in pseudo_url):
-                url = content[0]
-                playlist_start = url.find('list=')
-                url = url[playlist_start:]
-                playlist_end = url.find('&')
-                if playlist_end == -1:
-                    url = url
+                elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("list" in pseudo_url):
+                    url = content[0]
+                    playlist_start = url.find('list=')
+                    url = url[playlist_start:]
+                    playlist_end = url.find('&')
+                    if playlist_end == -1:
+                        url = url
+                    else:
+                        url = url[:playlist_end]
+                    youtube = 'https://www.youtube.com'
+                    url = "https://www.youtube.com/playlist?" + url
+
+                    await ctx.send(":white_check_mark: Playlist sucessful added!")
+                    result = ytdl.extract_info(url, download=False)
+                    if 'entries' in result:
+                        # Can be a playlist or a list of videos
+                        video = result['entries']
+
+                        #loops entries to grab each video_url
+                        for i, item in enumerate(video):
+                            self.queue.append(result['entries'][i]['webpage_url'])
+
+                elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("watch" in pseudo_url):
+                    url = content[0]
+                    self.queue += [url,]
+                    await ctx.send(":white_check_mark: **{}** adicionou a música **{}**!".format("Turtle", url_data.title.string[:-10]))
+                elif validators.url(pseudo_url):
+                    await ctx.send(":x: This is not a music video!")
                 else:
-                    url = url[:playlist_end]
-                youtube = 'https://www.youtube.com'
-                url = "https://www.youtube.com/playlist?" + url
+                    video = ytdl.extract_info(f"ytsearch:{content}", download=False)['entries'][0]
+                    self.queue.append(video['webpage_url'])
 
-                await ctx.send(":white_check_mark: Playlist sucessful added!")
-                result = ytdl.extract_info(url, download=False)
-                if 'entries' in result:
-                    # Can be a playlist or a list of videos
-                    video = result['entries']
-
-                    #loops entries to grab each video_url
-                    for i, item in enumerate(video):
-                        self.queue.append(result['entries'][i]['webpage_url'])
-
-            elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("watch" in pseudo_url):
-                url = content[0]
-                self.queue += [url,]
-                await ctx.send(":white_check_mark: **{}** adicionou a música **{}**!".format("Turtle", url_data.title.string[:-10]))
-            elif validators.url(pseudo_url):
-                await ctx.send(":x: This is not a music video!")
-            else:
-                video = ytdl.extract_info(f"ytsearch:{content}", download=False)['entries'][0]
-                self.queue.append(video['webpage_url'])
-
-                await ctx.send(":white_check_mark: {} added the song **{}**!".format("Turtle", video['title']))                                
+                    await ctx.send(":white_check_mark: {} added the song **{}**!".format("Turtle", video['title']))                                
         except:
             await ctx.send(":x: Ocorreu um erro inesperado durante o uso do comando **add** :turtle:")
-
-        while self.queue:
-            print(self.queue[0])
-            async with ctx.typing():
-                self.player = await YTDLSource.from_url(self.queue[0], loop=self.bot.loop, stream=True)
-                ctx.voice_client.play(self.player, after=lambda e: print('Player error: %s' % e) if e else None)
-            
-            embedVar = discord.Embed(title="Start Playing", description='Now playing: {}'.format(self.player.title), color=0x0099ff)
-            await ctx.send(embed=embedVar)
-
-            duration = self.player.duration + 3
-            await asyncio.sleep(duration)
-
-            if self.loop:
-                last_played = self.queue[0]
-                del self.queue[0]
-                self.queue.append(last_played)
-            else:
-                del self.queue[0]
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -304,7 +275,30 @@ class Music(commands.Cog):
     @commands.command()
     async def stop(self, ctx):
         """Stops and disconnects the bot from voice"""
+        self.queue = []
         await ctx.voice_client.disconnect()
+
+    @play.after_invoke
+    @skip.after_invoke
+    async def ensure_play(self, ctx):
+        if not ctx.voice_client.is_playing():
+            while self.queue:
+                async with ctx.typing():
+                    self.player = await YTDLSource.from_url(self.queue[0], loop=self.bot.loop, stream=True)
+                    ctx.voice_client.play(self.player, after=lambda e: print('Player error: %s' % e) if e else None)
+                
+                embedVar = discord.Embed(title="Start Playing", description='Now playing: {}'.format(self.player.title), color=0x0099ff)
+                await ctx.send(embed=embedVar)
+
+                duration = self.player.duration + 3
+                await asyncio.sleep(duration)
+
+                if self.loop:
+                    last_played = self.queue[0]
+                    del self.queue[0]
+                    self.queue.append(last_played)
+                else:
+                    del self.queue[0]
 
     @play.before_invoke
     async def ensure_voice(self, ctx):
