@@ -26,6 +26,7 @@ if __name__ == "__main__":
     with open('config.json') as json_file:
         data = json.load(json_file)
         token = data['token']
+        youtubeToken = data['youtubeToken']
     
-    bot.add_cog(Music(bot))
+    bot.add_cog(Music(bot, youtubeToken))
     bot.run(token)

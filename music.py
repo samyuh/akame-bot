@@ -4,16 +4,14 @@ from discord.ext import commands
 import asyncio
 import youtube_dl
 
-#Web Scrap
-import requests
-from bs4 import BeautifulSoup
-
 #See if a link is a URL
 import validators
 
 #mat
 from math import ceil
 import random
+
+from fetchYoutube import *
 
 # Suppress noise about console usage from errors
 youtube_dl.utils.bug_reports_message = lambda: ''
@@ -23,7 +21,7 @@ ytdl_format_options = {
     'format': 'bestaudio/best',
     'outtmpl': '%(extractor)s-%(id)s-%(title)s.%(ext)s',
     'restrictfilenames': True,
-    'noplaylist': True,
+    'noplaylist': False,
     'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
@@ -54,26 +52,25 @@ class YTDLSource(discord.PCMVolumeTransformer):
     async def from_url(cls, url, *, loop=None, stream=False):
         loop = loop or asyncio.get_event_loop()
         data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-
+                        
         if 'entries' in data:
             # take first item from a playlist
             data = data['entries'][0]
-
+            
         filename = data['url'] if stream else ytdl.prepare_filename(data)
         return cls(discord.FFmpegPCMAudio(filename, **ffmpeg_options), data=data)
 
 class Music(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot, token):
         self.bot = bot
+        self.fetch = FetchYoutube(token)
         self.queue = []
         self.loop = False
         self.player = None
     
     @commands.command(pass_context=True, aliases=['Skip'])
     async def skip(self, ctx):
-        '''Skip the current track
-        If loop is enabled, song is appended to end
-        Otherwise, song is deleted from playlist'''
+        """Skip the current track"""
 
         vc = ctx.voice_client
 
@@ -98,7 +95,7 @@ class Music(commands.Cog):
 
     @commands.command(pass_context=True)
     async def pause(self, ctx):
-        '''Turtle pause the current song'''
+        """Pause the current song"""
         try:
             ctx.voice_client.pause()
             await ctx.send(":white_check_mark: Pause!")
@@ -109,84 +106,31 @@ class Music(commands.Cog):
     #Resume music
     @commands.command(pass_context=True)
     async def resume(self, ctx):
-        '''Turtle resume the current song'''
+        """Resume the current song"""
         try:
             ctx.voice_client.resume()
             await ctx.send(":white_check_mark: Música retomada!")
         except:
             await ctx.send(":x: Turtle hasn't started singing yet!")
 
-    #Add songs to queue
-    @commands.command(pass_context=True, aliases=['a'])
-    async def add(self, ctx, *args):
-        '''Add a song to queue
-        !add [YOUTUBE_URL] to play [YOUTUBE_URL] music
-        !add [SONG_NAME] to play [SONG_NAME] music
-        '''
-        content = ""
-        for i in args:
-            content += i + " "
-        content = content.split()
-
-        try:
-            pseudo_url = content[0]
-            if validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("radio" in pseudo_url):
-                await ctx.send(":x: I can't play Youtube Radio playlists!")
-
-            elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("list" in pseudo_url):
-                url = content[0]
-                playlist_start = url.find('list=')
-                url = url[playlist_start:]
-                playlist_end = url.find('&')
-                if playlist_end == -1:
-                    url = url
-                else:
-                    url = url[:playlist_end]
-                youtube = 'https://www.youtube.com'
-                url = "https://www.youtube.com/playlist?" + url
-
-                await ctx.send(":white_check_mark: Playlist sucessful added!")
-                result = ytdl.extract_info(url, download=False)
-                if 'entries' in result:
-                    # Can be a playlist or a list of videos
-                    video = result['entries']
-
-                    #loops entries to grab each video_url
-                    for i, item in enumerate(video):
-                        self.queue.append(result['entries'][i]['webpage_url'])
-
-            elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("watch" in pseudo_url):
-                url = content[0]
-                self.queue += [url,]
-                await ctx.send(":white_check_mark: **{}** adicionou a música **{}**!".format("Turtle", url_data.title.string[:-10]))
-            elif validators.url(pseudo_url):
-                await ctx.send(":x: This is not a music video!")
-            else:
-                video = ytdl.extract_info(f"ytsearch:{content}", download=False)['entries'][0]
-                self.queue.append(video['webpage_url'])
-
-                await ctx.send(":white_check_mark: {} added the song **{}**!".format("Turtle", video['title']))                                
-        except:
-            await ctx.send(":x: Ocorreu um erro inesperado durante o uso do comando **add** :turtle:")
-
 
     #Show the queue
     @commands.command(pass_context=True, aliases=['q'])
     async def queue(self, ctx, page=1):
-        '''Show the current songs in queue.
-        !queue [page]'''
-        string = '```Playing Right Now: {}\n\n'.format(self.queue[0])
+        """Show the current songs in queue.
+        !queue [page]"""
+        string = '```Playing Right Now: {}\n\n'.format(self.fetch.parse_name(self.queue[0]))
         start_in = 1 + 15*(page-1)
         go_to = 16 + 15*(page-1)
-        if page > ceil(len(player)/15):
-            await client.say("Not too many songs in the queue! Wait! You can add more, and then you can acess page {}".format(page))
+        if page > ceil(len(self.queue)/15):
+            await ctx.send("Not too many songs in the queue! Wait! You can add more, and then you can acess page {}".format(page))
         else:
             while start_in < go_to and start_in < len(self.queue):
                 if start_in < 10:
                     number = str(start_in)+ ' '
                 else:
                     number = start_in
-                string += '{} ->\t{} \n'.format(number, self.queue[start_in])
+                string += '{} ->\t{} \n'.format(number, self.fetch.parse_name(self.queue[start_in]))
                 start_in += 1
             string += '\nPage {}\{}```'.format(page, (ceil(len(self.queue)/15)))
             await ctx.send(string)
@@ -195,8 +139,8 @@ class Music(commands.Cog):
     #Enable and disable the queue loop
     @commands.command(pass_context=True, aliases=['qloop'])
     async def loop(self, ctx):
-        '''Enable/Disable Queue Loop
-        '''
+        """Enable/Disable Queue Loop"""
+
         self.loop = not self.loop
         if self.loop:
             await ctx.send(":white_check_mark: Loop ativado!")
@@ -206,61 +150,48 @@ class Music(commands.Cog):
 
     @commands.command(pass_context=True, aliases=['clean','cleanq'])
     async def clear(self, ctx):
-        '''Clean Queue
-        '''
+        """Clean Queue"""
         self.queue = []
         await ctx.send(":white_check_mark: Bye, songs! :cry:")
 
     @commands.command()
     async def play(self, ctx, *args):
-        """Plays from a url (almost anything youtube_dl supports)"""
+        """Plays from a url or a search query (almost anything youtube_dl supports)"""
 
         content = ""
         for i in args:
             content += i + " "
         content = content.split()
 
-        try:
-            if content:
-                pseudo_url = content[0]
-                if validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("radio" in pseudo_url):
-                    await ctx.send(":x: I can't play Youtube Radio playlists!")
+        if content:
+            pseudo_url = content[0]
 
-                elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("list" in pseudo_url):
-                    url = content[0]
-                    playlist_start = url.find('list=')
-                    url = url[playlist_start:]
-                    playlist_end = url.find('&')
-                    if playlist_end == -1:
-                        url = url
-                    else:
-                        url = url[:playlist_end]
-                    youtube = 'https://www.youtube.com'
-                    url = "https://www.youtube.com/playlist?" + url
+            # Radio
+            if validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("radio" in pseudo_url):
+                await ctx.send(":x: I can't play Youtube Radio playlists!")
 
-                    await ctx.send(":white_check_mark: Playlist sucessful added!")
-                    result = ytdl.extract_info(url, download=False)
-                    if 'entries' in result:
-                        # Can be a playlist or a list of videos
-                        video = result['entries']
+            # Playlist
+            elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("list" in pseudo_url):
+                self.queue = self.fetch.parse_playlist(pseudo_url)
+                
+                await ctx.send(":white_check_mark: Adicionou a playlist!")
 
-                        #loops entries to grab each video_url
-                        for i, item in enumerate(video):
-                            self.queue.append(result['entries'][i]['webpage_url'])
+            # Youtube Video
+            elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("watch" in pseudo_url):
+                self.queue += [content[0],]
 
-                elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("watch" in pseudo_url):
-                    url = content[0]
-                    self.queue += [url,]
-                    await ctx.send(":white_check_mark: **{}** adicionou a música **{}**!".format("Turtle", url_data.title.string[:-10]))
-                elif validators.url(pseudo_url):
-                    await ctx.send(":x: This is not a music video!")
-                else:
-                    video = ytdl.extract_info(f"ytsearch:{content}", download=False)['entries'][0]
-                    self.queue.append(video['webpage_url'])
+                await ctx.send(":white_check_mark: **{}** adicionou a música **{}**!".format("Turtle", url_data.title.string[:-10]))
 
-                    await ctx.send(":white_check_mark: {} added the song **{}**!".format("Turtle", video['title']))                                
-        except:
-            await ctx.send(":x: Ocorreu um erro inesperado durante o uso do comando **add** :turtle:")
+            # Random URL
+            elif validators.url(pseudo_url):
+                await ctx.send(":x: This is not a music video!")
+
+            # Query Search
+            else:
+                video = ytdl.extract_info(f"ytsearch:{content}", download=False)['entries'][0]
+                self.queue.append(video['webpage_url'])
+
+                await ctx.send(":white_check_mark: {} added the song **{}**!".format("Turtle", video['title']))
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -290,7 +221,7 @@ class Music(commands.Cog):
                 embedVar = discord.Embed(title="Start Playing", description='Now playing: {}'.format(self.player.title), color=0x0099ff)
                 await ctx.send(embed=embedVar)
 
-                duration = self.player.duration + 3
+                duration = self.player.duration + 5
                 await asyncio.sleep(duration)
 
                 if self.loop:
