@@ -2,23 +2,16 @@ import discord
 from discord.ext import commands
 
 import asyncio
-import time
-import threading
 
-import youtube_dl
-
-#See if a link is a URL
 import validators
 
-#mat
 from math import ceil
-import random
 
-from fetchYoutube import *
+import youtube_dl
+from aux_youtube import *
 
 # Suppress noise about console usage from errors
 youtube_dl.utils.bug_reports_message = lambda: ''
-
 
 ytdl_format_options = {
     'format': 'bestaudio/best',
@@ -35,11 +28,14 @@ ytdl_format_options = {
 }
 
 ffmpeg_options = {
+    'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
     'options': '-vn'
 }
 
 ytdl = youtube_dl.YoutubeDL(ytdl_format_options)
 
+play = asyncio.Lock()
+lock = asyncio.Lock()
 
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
@@ -68,14 +64,10 @@ class Music(commands.Cog):
         self.bot = bot
         self.fetch = FetchYoutube(token)
         self.queue = []
+
         self.loop = False
-
-        self.playing = 0
-        self.paused = 0
         self.player = None
-        self.remainingSongTime = 9999999999999999
-        self.lock = asyncio.Lock()
-
+        self.playing = 0
     
     @commands.command(pass_context=True, aliases=['Skip'])
     async def skip(self, ctx):
@@ -92,20 +84,15 @@ class Music(commands.Cog):
             return
 
         vc.stop()
-
+        
         embedVar = discord.Embed(title="Skip", description="Skipped Song", color=0x0099ff)
         await ctx.send(embed=embedVar)
-
-        self.paused = 0
-        self.lock.release()
-
 
     @commands.command(pass_context=True)
     async def pause(self, ctx):
         """Pause the current song"""
         try:
             ctx.voice_client.pause()
-            self.paused = 1
             embedVar = discord.Embed(title="Pause", description="Paused current song", color=0x0099ff)
             await ctx.send(embed=embedVar)
         except:
@@ -119,7 +106,6 @@ class Music(commands.Cog):
         """Resume the current song"""
         try:
             ctx.voice_client.resume()
-            self.paused = 0
             embedVar = discord.Embed(title="Resume", description="Resume current song", color=0x0099ff)
             await ctx.send(embed=embedVar)
         except:
@@ -132,7 +118,9 @@ class Music(commands.Cog):
     async def queue(self, ctx, page=1):
         """Show the current songs in queue.
         !queue [page]"""
-        print("here")
+        if not self.queue:
+            return
+        
         string = '```Playing Right Now: {}\n\n'.format(self.fetch.parse_name(self.queue[0]))
         start_in = 1 + 15*(page-1)
         go_to = 16 + 15*(page-1)
@@ -168,6 +156,9 @@ class Music(commands.Cog):
     async def clear(self, ctx):
         """Clean Queue"""
         self.queue = []
+
+        ctx.voice_client.stop()
+
         embedVar = discord.Embed(title="Stop", description="Deleted all songs", color=0x0099ff)
         await ctx.send(embed=embedVar)
 
@@ -199,7 +190,7 @@ class Music(commands.Cog):
             elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("watch" in pseudo_url):
                 self.queue += [content[0],]
 
-                embedVar = discord.Embed(title="Added Song", description="Added the song **{}**!".format(url_data.title.string[:-10]), color=0x0099ff)
+                embedVar = discord.Embed(title="Added Song", description="Added the song!", color=0x0099ff)
                 await ctx.send(embed=embedVar)
             
             # Spotify Song
@@ -214,14 +205,16 @@ class Music(commands.Cog):
 
             # Random URL
             elif validators.url(pseudo_url):
-                await ctx.send(":x: This is not a music video!")
+                embedVar = discord.Embed(title="Error", description="This is not a valid music video", color=0xff0000)
+                await ctx.send(embed=embedVar)
 
             # Query Search
             else:
                 video = ytdl.extract_info(f"ytsearch:{content}", download=False)['entries'][0]
                 self.queue.append(video['webpage_url'])
 
-                await ctx.send(":white_check_mark: {} added the song **{}**!".format("Turtle", video['title']))
+                embedVar = discord.Embed(title="Added Song", description="Added the song **{}**!".format(video['title']), color=0x0099ff)
+                await ctx.send(embed=embedVar)
 
     @commands.command()
     async def volume(self, ctx, volume: int):
@@ -237,54 +230,44 @@ class Music(commands.Cog):
     async def stop(self, ctx):
         """Stops and disconnects the bot from voice"""
         self.queue = []
-        self.playing = 0
-        self.lock.release()
-        await ctx.voice_client.disconnect()
+
+        ctx.voice_client.stop()
         
-    def nextSong(self):
-        while (self.playing):
-            if not self.paused:
-                time.sleep(1)
-                self.remainingSongTime -= 1
-                print("Tempo que falta para música acabar: {}".format(self.remainingSongTime))
-
-                if(self.remainingSongTime < 0):
-                    self.lock.release()
-                    time.sleep(5)
-
+        await ctx.voice_client.disconnect()
+    
     @play.after_invoke
     async def ensure_play(self, ctx):
         if self.playing:
-            return 0
-        
-        if not ctx.voice_client.is_playing():
-            self.playing = 1
+            return
 
-            x = threading.Thread(target=self.nextSong)
-            x.start()
+        self.playing = 1
+        while True:
+            await lock.acquire()
+            if not self.queue:
+                break
 
-            while self.queue:
-                await self.lock.acquire()
-
-                ctx.voice_client.stop()
-
-                async with ctx.typing():
-                    self.player = await YTDLSource.from_url(self.queue[0], loop=self.bot.loop, stream=True)
-                    ctx.voice_client.play(self.player, after=lambda e: print('Player error: %s' % e) if e else None)
+            def release(error):
+                if error:
+                    print('Player error: %s' % error) 
                 
-                embedVar = discord.Embed(title="Start Playing", description='Now playing: {}'.format(self.player.title), color=0x0099ff)
-                await ctx.send(embed=embedVar)
+                lock.release()
 
-                # next Song
-                if self.loop:
-                    last_played = self.queue[0]
-                    del self.queue[0]
-                    self.queue.append(last_played)
-                else:
-                    del self.queue[0]
+            self.player = await YTDLSource.from_url(self.queue[0], loop=self.bot.loop, stream=True)
+            ctx.voice_client.play(self.player, after=lambda error: release(error))
+            
+            embedVar = discord.Embed(title="Start Playing", description='Now playing: {}'.format(self.player.title), color=0x0099ff)
+            await ctx.send(embed=embedVar)
 
-                self.remainingSongTime = self.player.duration
-            self.playing = 0
+            if self.loop:
+                last_played = self.queue[0]
+                del self.queue[0]
+                self.queue.append(last_played)
+            else:
+                del self.queue[0]
+            
+
+        lock.release()
+        self.playing = 0   
 
     @play.before_invoke
     async def ensure_voice(self, ctx):
