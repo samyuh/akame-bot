@@ -2,6 +2,9 @@ import discord
 from discord.ext import commands
 
 import asyncio
+import time
+import threading
+
 import youtube_dl
 
 #See if a link is a URL
@@ -66,7 +69,13 @@ class Music(commands.Cog):
         self.fetch = FetchYoutube(token)
         self.queue = []
         self.loop = False
+
+        self.playing = 0
+        self.paused = 0
         self.player = None
+        self.remainingSongTime = 9999999999999999
+        self.lock = asyncio.Lock()
+
     
     @commands.command(pass_context=True, aliases=['Skip'])
     async def skip(self, ctx):
@@ -83,14 +92,12 @@ class Music(commands.Cog):
             return
 
         vc.stop()
-        await ctx.send(f'**`{ctx.author}`**: Skipped the song!')
 
-        if self.loop:
-            last_played = self.queue[0]
-            del self.queue[0]
-            self.queue.append(last_played)
-        else:
-            del self.queue[0]
+        embedVar = discord.Embed(title="Skip", description="Skipped Song", color=0x0099ff)
+        await ctx.send(embed=embedVar)
+
+        self.paused = 0
+        self.lock.release()
 
 
     @commands.command(pass_context=True)
@@ -98,9 +105,12 @@ class Music(commands.Cog):
         """Pause the current song"""
         try:
             ctx.voice_client.pause()
-            await ctx.send(":white_check_mark: Pause!")
+            self.paused = 1
+            embedVar = discord.Embed(title="Pause", description="Paused current song", color=0x0099ff)
+            await ctx.send(embed=embedVar)
         except:
-            await ctx.send(":x: Turtle isn't singing!")
+            embedVar = discord.Embed(title="Error", description="Error on pause", color=0x0099ff)
+            await ctx.send(embed=embedVar)
 
 
     #Resume music
@@ -109,9 +119,12 @@ class Music(commands.Cog):
         """Resume the current song"""
         try:
             ctx.voice_client.resume()
-            await ctx.send(":white_check_mark: Música retomada!")
+            self.paused = 0
+            embedVar = discord.Embed(title="Resume", description="Resume current song", color=0x0099ff)
+            await ctx.send(embed=embedVar)
         except:
-            await ctx.send(":x: Turtle hasn't started singing yet!")
+            embedVar = discord.Embed(title="Error", description="Error on resume", color=0x0099ff)
+            await ctx.send(embed=embedVar)
 
 
     #Show the queue
@@ -119,6 +132,7 @@ class Music(commands.Cog):
     async def queue(self, ctx, page=1):
         """Show the current songs in queue.
         !queue [page]"""
+        print("here")
         string = '```Playing Right Now: {}\n\n'.format(self.fetch.parse_name(self.queue[0]))
         start_in = 1 + 15*(page-1)
         go_to = 16 + 15*(page-1)
@@ -143,16 +157,19 @@ class Music(commands.Cog):
 
         self.loop = not self.loop
         if self.loop:
-            await ctx.send(":white_check_mark: Loop ativado!")
+            embedVar = discord.Embed(title="Loop", description="Queue loop enabled", color=0x0099ff)
+            await ctx.send(embed=embedVar)
         else:
-            await ctx.send(":x: Loop desativado!")
+            embedVar = discord.Embed(title="Loop", description="Queue loop disabled", color=0x0099ff)
+            await ctx.send(embed=embedVar)
 
 
     @commands.command(pass_context=True, aliases=['clean','cleanq'])
     async def clear(self, ctx):
         """Clean Queue"""
         self.queue = []
-        await ctx.send(":white_check_mark: Bye, songs! :cry:")
+        embedVar = discord.Embed(title="Stop", description="Deleted all songs", color=0x0099ff)
+        await ctx.send(embed=embedVar)
 
     @commands.command()
     async def play(self, ctx, *args):
@@ -168,19 +185,32 @@ class Music(commands.Cog):
 
             # Radio
             if validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("radio" in pseudo_url):
-                await ctx.send(":x: I can't play Youtube Radio playlists!")
+                embedVar = discord.Embed(title="Error", description="Can't play youtube Radio playlist!", color=0xff0000)
+                await ctx.send(embed=embedVar)
 
             # Playlist
             elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("list" in pseudo_url):
                 self.queue = self.fetch.parse_playlist(pseudo_url)
                 
-                await ctx.send(":white_check_mark: Adicionou a playlist!")
+                embedVar = discord.Embed(title="Added Playlist", description="Added a new playlist!", color=0x0099ff)
+                await ctx.send(embed=embedVar)
 
             # Youtube Video
             elif validators.url(pseudo_url) and ("youtube" in pseudo_url) and ("watch" in pseudo_url):
                 self.queue += [content[0],]
 
-                await ctx.send(":white_check_mark: **{}** adicionou a música **{}**!".format("Turtle", url_data.title.string[:-10]))
+                embedVar = discord.Embed(title="Added Song", description="Added the song **{}**!".format(url_data.title.string[:-10]), color=0x0099ff)
+                await ctx.send(embed=embedVar)
+            
+            # Spotify Song
+            elif validators.url(pseudo_url) and ("spotify" in pseudo_url) and ("track" in pseudo_url):
+                embedVar = discord.Embed(title="Error", description="Spotify songs not implemented", color=0xff0000)
+                await ctx.send(embed=embedVar)
+
+            # Spotify Playlist
+            elif validators.url(pseudo_url) and ("spotify" in pseudo_url) and ("playlist" in pseudo_url):
+                embedVar = discord.Embed(title="Error", description="Spotify playlist not implemented", color=0xff0000)
+                await ctx.send(embed=embedVar)
 
             # Random URL
             elif validators.url(pseudo_url):
@@ -207,13 +237,37 @@ class Music(commands.Cog):
     async def stop(self, ctx):
         """Stops and disconnects the bot from voice"""
         self.queue = []
+        self.playing = 0
+        self.lock.release()
         await ctx.voice_client.disconnect()
+        
+    def nextSong(self):
+        while (self.playing):
+            if not self.paused:
+                time.sleep(1)
+                self.remainingSongTime -= 1
+                print("Tempo que falta para música acabar: {}".format(self.remainingSongTime))
+
+                if(self.remainingSongTime < 0):
+                    self.lock.release()
+                    time.sleep(5)
 
     @play.after_invoke
-    @skip.after_invoke
     async def ensure_play(self, ctx):
+        if self.playing:
+            return 0
+        
         if not ctx.voice_client.is_playing():
+            self.playing = 1
+
+            x = threading.Thread(target=self.nextSong)
+            x.start()
+
             while self.queue:
+                await self.lock.acquire()
+
+                ctx.voice_client.stop()
+
                 async with ctx.typing():
                     self.player = await YTDLSource.from_url(self.queue[0], loop=self.bot.loop, stream=True)
                     ctx.voice_client.play(self.player, after=lambda e: print('Player error: %s' % e) if e else None)
@@ -221,9 +275,7 @@ class Music(commands.Cog):
                 embedVar = discord.Embed(title="Start Playing", description='Now playing: {}'.format(self.player.title), color=0x0099ff)
                 await ctx.send(embed=embedVar)
 
-                duration = self.player.duration + 5
-                await asyncio.sleep(duration)
-
+                # next Song
                 if self.loop:
                     last_played = self.queue[0]
                     del self.queue[0]
@@ -231,11 +283,15 @@ class Music(commands.Cog):
                 else:
                     del self.queue[0]
 
+                self.remainingSongTime = self.player.duration
+            self.playing = 0
+
     @play.before_invoke
     async def ensure_voice(self, ctx):
         if ctx.voice_client is None:
             if ctx.author.voice:
                 await ctx.author.voice.channel.connect()
             else:
-                await ctx.send("You are not connected to a voice channel.")
+                embedVar = discord.Embed(title="Error", description="You're not connected to a voice channel", color=0xff0000)
+                await ctx.send(embed=embedVar)
                 raise commands.CommandError("Author not connected to a voice channel.")
