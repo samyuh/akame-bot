@@ -8,7 +8,7 @@ import validators
 from math import ceil
 
 import youtube_dl
-from aux_youtube import *
+from .aux_youtube import *
 
 # Suppress noise about console usage from errors
 youtube_dl.utils.bug_reports_message = lambda: ''
