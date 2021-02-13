@@ -4,24 +4,21 @@ import sys
 import discord
 from discord.ext import commands
 
+intents = discord.Intents.default()
+intents.members = True
+
 bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"),
-                   description='Akame Bot')
+                   description='Akame Bot', intents=intents)
 
 @bot.event
 async def on_ready():
     print('Logged in as {0} ({0.id})'.format(bot.user))
-    print('------')
-
-@bot.command()
-async def ping(ctx):
-    """Pong"""
-    embedVar = discord.Embed(title="Title", description="Desc", color=0x00ff00)
-    embedVar.add_field(name="Field1", value="hi", inline=False)
-    embedVar.add_field(name="Field2", value="hi2", inline=False)
-    await ctx.send(embed=embedVar)
+    print(bot.get_user(536937288777728002))
+    print('\n------')
 
 # Costum Modules
 from music.music import Music
+from misc.misc import Misc
 
 if __name__ == "__main__":
     with open('config.json') as json_file:
@@ -30,4 +27,5 @@ if __name__ == "__main__":
         youtubeToken = data['youtubeToken']
     
     bot.add_cog(Music(bot, youtubeToken))
+    bot.add_cog(Misc(bot))
     bot.run(token)
