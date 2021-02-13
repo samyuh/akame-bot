@@ -1,2 +1,4 @@
 # Configuration file
 config.json
+# Cache
+__pycache__/

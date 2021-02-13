@@ -1,13 +1,11 @@
 import json
+import sys
 
 import discord
 from discord.ext import commands
 
 bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"),
                    description='Akame Bot')
-
-# Costum Modules
-from music import *
 
 @bot.event
 async def on_ready():
@@ -22,10 +20,14 @@ async def ping(ctx):
     embedVar.add_field(name="Field2", value="hi2", inline=False)
     await ctx.send(embed=embedVar)
 
+# Costum Modules
+from music.music import Music
+
 if __name__ == "__main__":
     with open('config.json') as json_file:
         data = json.load(json_file)
         token = data['token']
+        youtubeToken = data['youtubeToken']
     
-    bot.add_cog(Music(bot))
+    bot.add_cog(Music(bot, youtubeToken))
     bot.run(token)
