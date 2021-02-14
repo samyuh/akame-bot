@@ -6,7 +6,8 @@ Create your config.json file
 
 ```
 {
-    "token": "AAAA" // Your discord bot token
+    "token": "XXXXXXXXXXXXXXXXXXXXX",
+    "youtubeToken": "XXXXXXXXXXXXXXXXXXXXX"
 }
 ```
 
