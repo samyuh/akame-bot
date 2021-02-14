@@ -1,7 +1,7 @@
 # Discord Bot
 Akame Bot is bot done for a discord server to have fun with some friends! 
 
-# Config
+### Config
 Create your config.json file
 
 ```
@@ -13,6 +13,7 @@ Create your config.json file
 
 Make sure both packages are installed
 > sudo apt-get install ffmpeg
+
 > sudo apt-get install python
 
 Python requires the following modules
