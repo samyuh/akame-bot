@@ -11,17 +11,7 @@ Create your config.json file
 ```
 
 Make sure both packages are installed
-> Python
-
-> FFmpeg
-
+> sudo apt-get install ffmpeg
+> sudo apt-get install python
 Python requires the following modules
-> python -m pip install discord.py
-
-> python -m pip install ytdl
-
-> python -m pip install PyNaCl
-
-> python -m pip install beautifulsoup4
-
-> python -m pip install google-api-python-client
+> pip install -r requirements.txt
