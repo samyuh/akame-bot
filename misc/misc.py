@@ -7,6 +7,9 @@ import urllib.parse
 
 from core.database import Database, ProfileInfo
 
+import pathlib
+
+
 class Misc(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -68,6 +71,12 @@ class Misc(commands.Cog):
         embed.add_field(name="Last Appear", value=profile.lastText, inline=True)
         
         await ctx.send(embed=embed)
+
+    @commands.command(pass_context=True)
+    async def backup(self, ctx,):
+        """Get a backup of the files"""
+        databasePath = str(pathlib.Path().absolute()) + "/core/database/users.db"
+        await ctx.send(file=discord.File(databasePath))
 
     @commands.command(pass_context=True)
     async def weather(self, ctx, *location):
