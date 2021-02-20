@@ -13,7 +13,7 @@ class Misc(commands.Cog):
         self.base = Database(None)
         self.timeCounter.start()
         
-    @tasks.loop(seconds=5.0)
+    @tasks.loop(seconds=60.0)
     async def timeCounter(self):    
         guild = self.bot.get_guild(700343486897061991)
 
