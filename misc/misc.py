@@ -3,43 +3,23 @@ from discord.ext import commands, tasks
 
 import datetime
 
-all_profiles = {}
+import urllib.parse
 
-class ProfileInfo():
-    def __init__(self, user):
-        self.time = 1000
-        self.avatar = user.avatar_url
-        self.name = user.display_name
-        self.color = 0x0099ff
-        self.timeText = "Never"
-        self.lastText = "Never"
-        self.time = 0
-    
-    def incrementTime(self):
-        self.time += 1
+from core.database import Database, ProfileInfo
 
-        minutes_left = self.time
-
-        days = minutes_left // 1440
-        minutes_left = minutes_left - days*1440
-
-        hours = minutes_left // 60
-        minutes = minutes_left % 60
-
-        self.timeText = "{} days, {} hours, {} minutes".format(days, hours, minutes)
-
-        now = datetime.datetime.now()
-        self.lastText = "{}/{}/{} {}:{}".format(now.year, now.month, now.day, now.hour, now.minute)
+import pathlib
 
 
 class Misc(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.printer.start()
-    
+        self.base = Database(None)
+        self.timeCounter.start()
+        
     @tasks.loop(seconds=60.0)
-    async def printer(self):
+    async def timeCounter(self):    
         guild = self.bot.get_guild(700343486897061991)
+
         if guild != None:
             voice_channel_list = guild.voice_channels
             voice_channels_ids = []
@@ -52,36 +32,37 @@ class Misc(commands.Cog):
 
                 for member in members:
                     memids.append(member.id)
+            
+            for userId in memids:
+                if userId not in self.base.all_profiles:
+                    self.base.all_profiles[userId] = ProfileInfo(self.bot, userId)
+                    self.base.insertData(userId)
 
-            for i in memids:
-                userInfo = self.bot.get_user(i)
-                if userInfo not in all_profiles:
-                    all_profiles[userInfo] = ProfileInfo(userInfo)
-
-                all_profiles[userInfo].incrementTime()
+                self.base.all_profiles[userId].incrementTime()
+        
+        self.base.updateData()
 
 
     @commands.command(pass_context=True)
     async def profile(self, ctx, user=""):
         """Show profile pic"""
         if user == "":
-            userInfo = ctx.message.author
+            userId = ctx.message.author.id
         else:
-            print(user)
-            user = user.replace("<@!","")
-            user = user.replace(">","")
+            userId = user.replace("<@!","")
+            userId = userId.replace(">","")
 
-            userInfo = self.bot.get_user(int(user))
-            print(userInfo)
+            userId = int(userId)
+            print(userId)
+            userInfo = self.bot.get_user(userId)
             if userInfo == None:
                 return
 
-        if userInfo not in all_profiles:
-            all_profiles[userInfo] = ProfileInfo(userInfo)
+        if userId not in self.base.all_profiles:
+            self.base.all_profiles[userId] = ProfileInfo(self.bot, userId)
+            self.base.insertData(userId)
 
-        profile = all_profiles[userInfo]
-        print(profile.avatar)
-
+        profile = self.base.all_profiles[userId]
         embed = discord.Embed(color=profile.color)
         embed.set_author(name=profile.name, icon_url=profile.avatar)
 
@@ -89,4 +70,27 @@ class Misc(commands.Cog):
         embed.add_field(name="Time Connected", value=profile.timeText, inline=True)
         embed.add_field(name="Last Appear", value=profile.lastText, inline=True)
         
+        await ctx.send(embed=embed)
+
+    @commands.command(pass_context=True)
+    async def backup(self, ctx,):
+        """Get a backup of the files"""
+        databasePath = str(pathlib.Path().absolute()) + "/core/database/users.db"
+        await ctx.send(file=discord.File(databasePath))
+
+    @commands.command(pass_context=True)
+    async def weather(self, ctx, *location):
+        """Wheater"""
+        queryString = ""
+        for local in location: #handles spaces in strings
+            queryString += local + " "
+
+        encodeQueryString = urllib.parse.quote(queryString)
+        
+        newurl = "https://wttr.in/"+ encodeQueryString + ".png?0?m"
+
+        embed = discord.Embed(color=0xFFFF00)
+        embed.set_author(name="Weather Report: {}".format(queryString))
+        embed.set_image(url=newurl)
+
         await ctx.send(embed=embed)

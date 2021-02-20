@@ -4,6 +4,11 @@ import sys
 import discord
 from discord.ext import commands
 
+from core.database import Database
+import sqlite3
+
+import datetime
+
 intents = discord.Intents.default()
 intents.members = True
 
@@ -15,7 +20,14 @@ initial_extensions = ['misc', 'music']
 @bot.event
 async def on_ready():
     print('Logged in as {0} ({0.id})'.format(bot.user))
-    print('------')
+    print('---------')
+
+    print('Init Database')
+    database = Database(bot)
+
+    for extension in initial_extensions:
+        print('Loaded Extension: {}'.format(extension))
+        bot.load_extension(extension)
 
 if __name__ == "__main__":
     try:
@@ -25,8 +37,5 @@ if __name__ == "__main__":
     except FileNotFoundError:
         print("Create the file config.json. More information on README.")
         exit()
-
-    for extension in initial_extensions:
-        bot.load_extension(extension)
 
     bot.run(token)

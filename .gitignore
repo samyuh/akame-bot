@@ -1,4 +1,8 @@
-# Configuration file
+# Vscode configuration files
+.vscode
+# Configuration file and database
 config.json
+database/
+*.db
 # Cache
 __pycache__/
