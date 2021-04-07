@@ -23,7 +23,7 @@ class ProfileInfo():
         self.time = time
 
     def incrementTime(self):
-        self.time += 1
+        self.time += 0
 
         minutes_left = self.time
 
