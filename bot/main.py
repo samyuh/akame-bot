@@ -15,7 +15,7 @@ intents.members = True
 bot = commands.Bot(command_prefix=commands.when_mentioned_or("!"),
                 description='Akame Bot', intents=intents)
 
-initial_extensions = ['misc', 'music']
+initial_extensions = ['misc']
 
 @bot.event
 async def on_ready():
