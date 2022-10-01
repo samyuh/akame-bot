@@ -1,10 +1,17 @@
 # Discord Bot
 Akame Bot is bot done for a discord server to have fun with some friends! 
 
+---
+## `Table of Contents`
+- [Config](#config)
+- [Contribute](#contribute)
+- [Contributors](#contributors)
+
+---
 ### Config
 Create your config.json file
 
-```
+```json
 {
     "token": "XXXXXXXXXXXXXXXXXXXXX",
     "youtubeToken": "XXXXXXXXXXXXXXXXXXXXX"
@@ -12,25 +19,32 @@ Create your config.json file
 ```
 
 Make sure both packages are installed
-> sudo apt-get install ffmpeg
+```shell
+$ sudo apt-get install ffmpeg
+```
 
-> sudo apt-get install python
+```shell
+$ sudo apt-get install python
+```
 
 Python requires the following modules
-> pip install -r requirements.txt
+```shell
+$ pip install -r requirements.txt
+```
 
+---
 ### Contribute
 All types of contributors are welcomed to give their support to this project. Code and Non-code contributors are welcome. Beginners are also welcome.
 <b> <h3> For the initial start, fork the project and use git clone command to download the repository to your computer </b> </h3>. A standard procedure for working on an issue would be to:
 
 1. `git pull`, before creating a new branch, pull the changes from upstream. Your master needs to be up to date.
 
-```
+```shell
 $ git pull
 ```
 
 2. Create new branch from `master`
-```
+```shell
 $ git checkout -b [name_of_your_new_branch]
 ```
 
@@ -39,7 +53,7 @@ $ git checkout -b [name_of_your_new_branch]
 
 4. Push changes to GitHub
 
-```
+```shell
 $ git push origin [name_of_your_new_branch]
 ```
 
@@ -57,10 +71,23 @@ $ git push origin [name_of_your_new_branch]
 
 10. You made it! 🎊
 
-
-
+---
+### Contributors
 Thanks to all the people who have contributed:
-<br>
-<a href="https://github.com/Samuuuh/Python/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=Samuuuh/akame-bot"/>
-</a>
+<table>
+  <tbody>
+    <tr>
+      <td>
+         <a href="https://github.com/Samuuuh">
+         <img src="https://contrib.rocks/image?repo=Samuuuh/akame-bot"/>
+         </a>
+      </td>
+      <td>
+         <a href="https://github.com/KugelPfusch">
+         <img src="https://avatars.githubusercontent.com/u/77416636?s=96&v=4"/>
+         </a>
+      </td>
+    </tr>
+   <tbody>
+<table>
+
