@@ -1,5 +1,6 @@
 import discord
 from discord.ext import commands, tasks
+import random
 
 import datetime
 
@@ -96,12 +97,25 @@ class Misc(commands.Cog):
         embed.add_field(name="Wise words", value=profile.quote, inline=True)
         # embed.add_field(name="Time Connected", value=profile.timeText, inline=True)
         # embed.add_field(name="Last Appear", value=profile.lastText, inline=True)
-        
+        await ctx.send(embed=embed)
+
+    @commands.command(pass_context=True)
+    async def dice(self,ctx):
+        choice=random.randint(1,6)
+        embed = discord.Embed()
+        embed.add_field(name="Dice Roll :game_die:",value=f"Rolled a Die and got {choice}. ")
+        await ctx.send(embed=embed)
+
+    @commands.command(pass_context=True)
+    async def coin(self,ctx):
+        choice=random.choice(["Heads","Tails"])
+        embed = discord.Embed()
+        embed.add_field(name="Coin Toss :coin:",value=f" Flipped a coin and got {choice}. ")
         await ctx.send(embed=embed)
 
     @commands.command(pass_context=True)
     async def weather(self, ctx, *location):
-        """Show Wheater"""
+        """Show Weather"""
         queryString = ""
         for local in location: queryString += local + " "
 
