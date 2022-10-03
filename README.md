@@ -2,7 +2,7 @@
 Akame Bot is bot done for a discord server to have fun with some friends! 
 
 ---
-## `Table of Contents`
+## Table of Contents
 - [Config](#config)
 - [Contribute](#contribute)
 - [Contributors](#contributors)
@@ -48,46 +48,38 @@ $ git pull
 $ git checkout -b [name_of_your_new_branch]
 ```
 
-3. Work - commit - repeat ( be sure to be in your branch )
+3. Add changes
+```shell
+$ git add [filename]
+```
 
+4. Commit changes
+```shell
+$ git commit -m "Change message"
+```
 
-4. Push changes to GitHub
+5. Push changes to GitHub
 
 ```shell
 $ git push origin [name_of_your_new_branch]
 ```
 
-5. Submit your changes for review
+6. Submit your changes for review
    If you go to your repository on GitHub, you'll see a `Compare & pull request` button. Click on that button.
    
-6. Start a Pull Request
+7. Start a Pull Request
    Now submit the pull request and click on `Create pull request`.
    
-7. Get a code review approval/reject
+8. Get a code review approval/reject
+   
+9.  After approval, merge your PR 
 
-8. After approval, merge your PR 
+10. GitHub will automatically delete the branch after the merge is done. (they can still be restored).
 
-9. GitHub will automatically delete the branch after the merge is done. (they can still be restored).
-
-10. You made it! 🎊
+11. You made it! 🎊
 
 ---
 ### Contributors
 Thanks to all the people who have contributed:
-<table>
-  <tbody>
-    <tr>
-      <td>
-         <a href="https://github.com/Samuuuh">
-         <img src="https://contrib.rocks/image?repo=Samuuuh/akame-bot"/>
-         </a>
-      </td>
-      <td>
-         <a href="https://github.com/KugelPfusch">
-         <img src="https://avatars.githubusercontent.com/u/77416636?s=96&v=4"/>
-         </a>
-      </td>
-    </tr>
-   <tbody>
-<table>
-
+<a href="https://github.com/Samuuuh">
+<img src="https://contrib.rocks/image?repo=Samuuuh/akame-bot"/>
