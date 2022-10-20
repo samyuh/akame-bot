@@ -1,7 +1,8 @@
 import discord
 from discord.ext import commands, tasks
 import random
-
+import aiohttp
+import json
 import datetime
 
 import urllib.parse
@@ -11,6 +12,69 @@ from core.database import Database, ProfileInfo
 import pathlib
 
 
+async def random(ctx, name):
+    cs = aiohttp.ClientSession()
+    async with ctx.channel.typing():
+        r = await cs.get(f'https://api.jikan.moe/v4/random/{name}')
+        js = await r.json()
+        data = js['data']
+        await cs.close()
+
+        e = discord.Embed().set_thumbnail(
+            url=data["images"]["webp"]["image_url"])
+        e.color = 0x4440c0
+        e.title = data["title"]
+        e.url = data["url"]
+        oz = data["synopsis"]
+        if oz == None:
+            oz = ""
+        try:
+            oz = oz[:4096]
+        except:
+            pass
+        e.description = f"{oz}"
+
+        for name, value in data.items():
+
+            name = name.replace('_', ' ')
+            names = ['mal id', 'url', 'images', 'synopsis', 'titles']
+            if value==None or value==False or value==0 or value==True or value==[]:
+                pass
+            elif name in names:
+                pass
+            elif isinstance(value, dict):
+
+                try:
+                    if value['string'] == None:
+                        continue
+                    value = f"from {value['string']}"
+                    e.add_field(name=name.title(), value=value, inline=True)
+                except:
+                    continue
+
+            elif isinstance(value, list):
+                l = []
+                try:
+                    for i in range(0, len(value)):
+                        z = value[i]['name']
+                        l.append(z)
+
+                except:
+                    pass
+                else:
+                    e.add_field(name=name.title(),
+                                value=" • ".join(l),
+                                inline=True)
+                    pass
+            else:
+                try:
+                    value = '{:,}'.format(value)
+                except:
+                    pass
+                e.add_field(name=name.title(), value=value, inline=True)
+        await ctx.reply(mention_author=False, embed=e)
+        
+        
 class Misc(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -174,3 +238,10 @@ class Misc(commands.Cog):
                         voters.append(reactor.id)
         output = f"Results of the poll for '{embed.title}':\n" + '\n'.join(['{}: {}'.format(opt_dict[key], tally[key]) for key in tally.keys()])
         await ctx.send(output)
+    @commands.command(aliases=['rm', 'rmanga'])
+    async def random_manga(self, ctx):
+        await random(ctx, 'manga')
+
+    @commands.command(aliases=['ra', 'ranime'])
+    async def random_anime(self, ctx):
+        await random(ctx, 'anime')
